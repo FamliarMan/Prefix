@@ -5,7 +5,7 @@ import sys, getopt, re
 import os, fileinput
 
 # 排除的目录
-ExcludeDir = ['build', '.idea', 'target', '.gradle', 'lib', '.git', 'gradle','assets']
+ExcludeDir = ['build', '.idea', 'target', '.gradle', 'lib', '.git', 'gradle', 'assets']
 
 # 需要处理的模块
 WorkModule = []
@@ -15,8 +15,6 @@ Prefix = ""
 
 # 输出日志
 LogFile = None
-
-
 
 
 def cmd():
@@ -141,16 +139,48 @@ def rename_not_file_file(file_path, resource_name, module_name):
 
     fileinput.close()
 
-# 获取非文件资源的正则匹配规则
-def getNotFilePattern(file_path,resource_name):
-    # 字符串xml文件中的查找规则
-    str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
-    # 字符串java文件中的查找规则
-    str_java_pattern = re.compile('(R\s*.\s*string\s*.\s*)(' + resource_name + ')([\s,):])')
-    # 字符串layout文件中的查找规则
-    str_layout_xml_pattern = re.compile('("\s*@\s*string\s*/\s*)(' + resource_name + ')([\s"])')
 
-    # attr_xml_pattern =
+# 获取非文件资源的正则匹配规则
+def getNotFilePattern(file_path, resource_name):
+    if file_path.find("string") != -1:
+        # 字符串string.xml文件中的查找规则
+        str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
+        # 字符串java文件中的查找规则
+        str_java_pattern = re.compile('(R\s*.\s*string\s*.\s*)(' + resource_name + ')([\s,):])')
+        # 字符串layout文件中的查找规则
+        str_layout_xml_pattern = re.compile('("\s*@\s*string\s*/\s*)(' + resource_name + ')([\s"])')
+        return str_xml__pattern, str_layout_xml_pattern, str_java_pattern
+    elif file_path.find("attr") != -1:
+        # attr 资源在attr.xml中的匹配规则
+        attr_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
+        # attr 资源在layout文件中的查找规则
+        attr_layout_pattern = re.compile('(:\s*)(' + resource_name + ')(\s*=)')
+        # attr 资源在java文件中的查找规则
+        attr_java_pattern = re.compile('(R\s*\.\s*styleable\s*\.\s*[^_^\s]+_)(' + resource_name + ')([\s*)])')
+        return attr_xml_pattern, attr_layout_pattern, attr_java_pattern
+    elif file_path.find("color") != -1:
+        # color资源在color.xml文件中匹配规则
+        color_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
+        # color资源在layout文件中的匹配规则
+        color_layout_pattern = re.compile('("\s*@\s*color\s*/\s*)(' + resource_name + ')([\s"])')
+        # color 资源在java文件中的匹配规则
+        color_java_pattern = re.compile('(R\s*.\s*color\s*.\s*)(' + resource_name + ')([\s,):])')
+        return color_xml_pattern,color_layout_pattern,color_java_pattern
+    elif file_path.find("dimen") != -1:
+        # dimen资源在dimen.xml中的匹配规则
+        dimen_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
+        # dimen资源在layout文件中的匹配规则
+        dimen_layout_pattern = re.compile('("\s*@\s*dimen\s*/\s*)(' + resource_name + ')([\s"])')
+        # dimen 资源在java文件中的匹配规则
+        dimen_java_pattern = re.compile('(R\s*.\s*dimen\s*.\s*)(' + resource_name + ')([\s,):])')
+        return dimen_xml_pattern,dimen_layout_pattern,dimen_java_pattern
+
+    # style资源在style.xml中的匹配规则
+    style_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
+    # style资源在layout文件中的匹配规则
+    style_layout_pattern = re.compile('("\s*@\s*style\s*/\s*)(' + resource_name + ')([\s"])')
+    # style 资源在java文件中的匹配规则
+    style_java_pattern = re.compile('(R\s*.\s*style\s*.\s*)(' + resource_name + ')([\s,):])')
 
 
 # 获取所有字符串资源名称
@@ -212,4 +242,3 @@ try:
     main()
 except KeyboardInterrupt:
     pass
-
