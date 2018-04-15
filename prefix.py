@@ -328,6 +328,7 @@ def cmd():
         for o, a in opts:
             if o in ("-h", "--help"):
                 help_info()
+                sys.exit(0)
             elif o in ("-p", "--prefix"):
                 Prefix = a
             elif o in ("-e", "--exclude"):
@@ -338,14 +339,24 @@ def cmd():
                 WorkModule.extend(modules)
             else:
                 print("Wrong argument!")
+                sys.exit(-1)
 
     except getopt.GetoptError:
         print("Wrong argument!")
+        sys.exit(-1)
 
 
 # 输出帮助信息
 def help_info():
-    return
+    str_help = """
+     -m  <example1|example2>  传入本模块的上层依赖模块，有多个模块用“|”分割,不需要尖括号
+     -p  <pre_examp>          指定前缀名称
+     -e  <example1|example2>  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，
+                              默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 
+                              'gradle', 'assets'
+     -h                       打印帮助
+    """
+    print(str_help)
 
 
 # 输出非文件资源的日志日志
@@ -372,7 +383,7 @@ def log(resource_name, module_name, file_name):
 def log_string(string):
     global LogFile
     print(string)
-    LogFile.write(string+"\n")
+    LogFile.write(string + "\n")
 
 
 # 初始化输出日志
@@ -383,10 +394,21 @@ def init():
     WorkModule.append(os.path.basename(os.path.abspath(os.path.curdir)))
 
 
+# 一些简单的检查
+def check():
+    global Prefix, WorkModule
+    if not Prefix:
+        print("Please add -p argument")
+        sys.exit(-1)
+    if len(WorkModule) == 0:
+        print("Please add -m argument")
+        sys.exit(-1)
+
+
 def main():
-    global LogFile
-    init()
     cmd()
+    check()
+    init()
     rename_not_file()
     rename_file()
     return
@@ -396,4 +418,3 @@ try:
     main()
 except KeyboardInterrupt:
     pass
-
