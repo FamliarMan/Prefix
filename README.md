@@ -48,5 +48,5 @@ python3 prefix.py  -m [app|library1]  -p lib2_    -e [hehe|test]
 参数说明：
 * -m  传入本模块的上层依赖模块，有过个模块用“|”分割，注意，不需要示例中的中括号
 * -p  指定前缀名称
--e  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 'gradle', 'assets'
--h 打印帮助
+* -e  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 'gradle', 'assets'
+* -h 打印帮助
