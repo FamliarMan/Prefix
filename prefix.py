@@ -69,6 +69,8 @@ def rename_not_file_dir(dir_path, resource_name, module_name, xml_pat, layout_pa
         elif not os.path.isdir(cur_path):
             # 只处理xml和java文件
             if file.endswith(".xml") or file.endswith(".java"):
+                if cur_path.find("/res/value") != -1 and cur_path.find(os.path.abspath(os.path.curdir)) == -1:
+                    continue
                 rename_not_file_file(cur_path, resource_name, module_name, xml_pat, layout_pat, java_pat)
 
 
