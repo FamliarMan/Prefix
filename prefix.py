@@ -69,6 +69,8 @@ def rename_not_file_dir(dir_path, resource_name, module_name, xml_pat, layout_pa
         elif not os.path.isdir(cur_path):
             # 只处理xml和java文件
             if file.endswith(".xml") or file.endswith(".java"):
+                if cur_path.find("/res/value") != -1 and cur_path.find(os.path.abspath(os.path.curdir)) == -1:
+                    continue
                 rename_not_file_file(cur_path, resource_name, module_name, xml_pat, layout_pat, java_pat)
 
 
@@ -96,7 +98,7 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
         elif file_path.endswith(".xml"):
             if file_path.find("src/main/res/values") != -1:
                 # 该xml文件是非layout,drawable文件,一般是string.xml,color.xml等文件
-                if line.find("<!--") != -1:
+                if line.lstrip().startswith("<!--"):
                     # 跳过注释行
                     print(line, end="")
                     continue
@@ -109,7 +111,7 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
                     log(resource_name, module_name, os.path.basename(file_path))
             else:
                 # 对于layout和drawable中的xml文件
-                if line.find("<!--") != -1:
+                if line.lstrip().startswith("<!--") :
                     # 跳过注释行
                     print(line, end="")
                 elif layout_pat.search(line) is None:
@@ -180,7 +182,7 @@ def get_not_file_resources(path):
     for line in str_file:
         if line.find("<item") != -1:
             continue
-        if line.startswith('<!--'):
+        if line.lstrip().startswith("<!--"):
             continue
         res = resource_pat.findall(line)
         if len(res) != 0:
@@ -255,7 +257,7 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
     for line in fileinput.input(file_path, inplace=1):
         if file_path.endswith(".java"):
             # 对于java文件
-            if line.startswith("//") or line.startswith("/*"):
+            if line.lstrip().startswith("//") or line.lstrip().startswith("/*"):
                 # 跳过注释行
                 print(line, end="")
             elif java_pat.search(line) is None:
@@ -266,7 +268,7 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
                 print(line, end="")
                 log(resource_name, module_name, os.path.basename(file_path))
         elif file_path.endswith(".xml"):
-            if line.find("<!--") != -1:
+            if line.lstrip().startswith("<!--") :
                 # 跳过注释行
                 print(line, end="")
             elif xml_pat.search(line) is None:
@@ -332,10 +334,10 @@ def cmd():
             elif o in ("-p", "--prefix"):
                 Prefix = a
             elif o in ("-e", "--exclude"):
-                dirs = a.split("|")
+                dirs = a.replace(' ','').split(",")
                 ExcludeDir = ExcludeDir + dirs
             elif o in ("-m", "--module"):
-                modules = a.split("|")
+                modules = a.replace(' ','').split(",")
                 WorkModule.extend(modules)
             else:
                 print("Wrong argument!")
@@ -349,9 +351,9 @@ def cmd():
 # 输出帮助信息
 def help_info():
     str_help = """
-     -m  <example1|example2>  传入本模块的上层依赖模块，有多个模块用“|”分割,不需要尖括号
+     -m  <example1,example2>  传入本模块的上层依赖模块，有多个模块用“,”分割,不需要尖括号
      -p  <pre_examp>          指定前缀名称
-     -e  <example1|example2>  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，
+     -e  <example1,example2>  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，
                               默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 
                               'gradle', 'assets'
      -h                       打印帮助
@@ -382,6 +384,8 @@ def log(resource_name, module_name, file_name):
 # 向日志中写入一句话
 def log_string(string):
     global LogFile
+    if LogFile is None:
+        return
     print(string)
     LogFile.write(string + "\n")
 
@@ -416,5 +420,10 @@ def main():
 
 try:
     main()
+    # file_path = "/home/jianglei/AndroidStudioProjects/login/LoginModule/TDFLoginModule/src/main/res/values/colors.xml"
+    # str = get_not_file_resources(file_path)
+    # xml_pat ,layout_pat,java_pat = get_not_file_pattern(file_path,"black")
+    # rename_not_file_file(file_path,"black","TDFLoginModule",xml_pat,layout_pat,java_pat)
+    # print(str)
 except KeyboardInterrupt:
     pass
