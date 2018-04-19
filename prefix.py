@@ -19,6 +19,9 @@ Prefix = ""
 # 输出日志
 LogFile = None
 
+# 当前是否是修复模式
+IsFix = False
+
 ''''''''''''''''''''''''''''''''''' 以下是非文件资源的重命名方法'''''''''''''''''''''''''''''
 
 
@@ -27,6 +30,7 @@ def rename_not_file():
     global LogFile, Prefix
     possible_path = ["strings.xml", "string.xml", "colors.xml", "color.xml", "attr.xml",
                      "attrs.xml", "style.xml", "styles.xml", "dimen.xml", "dimens.xml"]
+
     has_resource_file = False
     for path in possible_path:
         resource_file_path = os.path.abspath(".") + '/src/main/res/values/' + path
@@ -69,8 +73,8 @@ def rename_not_file_dir(dir_path, resource_name, module_name, xml_pat, layout_pa
         elif not os.path.isdir(cur_path):
             # 只处理xml和java文件
             if file.endswith(".xml") or file.endswith(".java"):
-                if cur_path.find("/res/value") != -1 and cur_path.find(os.path.abspath(os.path.curdir)) == -1:
-                    continue
+                # if cur_path.find("/res/value") != -1 and cur_path.find(os.path.abspath(os.path.curdir)) == -1:
+                #     continue
                 rename_not_file_file(cur_path, resource_name, module_name, xml_pat, layout_pat, java_pat)
 
 
@@ -102,16 +106,26 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
                     # 跳过注释行
                     print(line, end="")
                     continue
-                elif xml_pat.search(line) is None:
+                elif line.find("<item") == -1 and xml_pat.search(line) is None:
                     # 跳过不包含目标的行
                     print(line, end="")
+                elif line.find("<item") != -1 and layout_pat.search(line) is None:
+                    # 跳过不包含目标的行
+                    print(line, end="")
+                elif line.find("<item") == -1 and file_path.find(os.path.abspath(os.path.curdir)) == -1:
+                    # 非本module下的非<item>项忽略
+                    print(line, end="")
                 else:
-                    line = xml_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
+                    if line.find("<item") != -1:
+                        # 对于item项，应该使用layout_xml规则
+                        line = layout_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
+                    else:
+                        line = xml_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
                     print(line, end="")
                     log(resource_name, module_name, os.path.basename(file_path))
             else:
                 # 对于layout和drawable中的xml文件
-                if line.lstrip().startswith("<!--") :
+                if line.lstrip().startswith("<!--"):
                     # 跳过注释行
                     print(line, end="")
                 elif layout_pat.search(line) is None:
@@ -131,9 +145,9 @@ def get_not_file_pattern(file_path, resource_name):
         # 字符串string.xml文件中的查找规则
         str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
         # 字符串java文件中的查找规则
-        str_java_pattern = re.compile('(R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);])')
+        str_java_pattern = re.compile('([^\.]R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);])')
         # 字符串layout文件中的查找规则
-        str_layout_xml_pattern = re.compile('("\s*@\s*string\s*/\s*)(' + resource_name + ')([\s"])')
+        str_layout_xml_pattern = re.compile('([">]\s*@\s*string\s*/\s*)(' + resource_name + ')([\s"<])')
         return str_xml__pattern, str_layout_xml_pattern, str_java_pattern
     elif file_path.find("attr") != -1:
         # attr 资源在attr.xml中的匹配规则
@@ -142,33 +156,33 @@ def get_not_file_pattern(file_path, resource_name):
         attr_layout_pattern = re.compile('(:\s*)(' + resource_name + ')(\s*=)')
         # attr 资源在java文件中的查找规则
         attr_java_pattern = re.compile(
-            '(R\s*\.\s*styleable\s*\.\s*)(' + resource_name + ')([_\s,;)])|(R\s*\.\s*styleable\s*\.\S*_)(' +
+            '([^\.]R\s*\.\s*styleable\s*\.\s*)(' + resource_name + ')([_\s,;)])|([^\.]R\s*\.\s*styleable\s*\.\s*\S*_)(' +
             resource_name + ')([\s,;)])')
         return attr_xml_pattern, attr_layout_pattern, attr_java_pattern
     elif file_path.find("color") != -1:
         # color资源在color.xml文件中匹配规则
         color_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # color资源在layout文件中的匹配规则
-        color_layout_pattern = re.compile('("\s*@\s*color\s*/\s*)(' + resource_name + ')([\s"])')
+        color_layout_pattern = re.compile('([">]\s*@\s*color\s*/\s*)(' + resource_name + ')([\s"<])')
         # color 资源在java文件中的匹配规则
-        color_java_pattern = re.compile('(R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);])')
+        color_java_pattern = re.compile('([^\.]R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);])')
         return color_xml_pattern, color_layout_pattern, color_java_pattern
     elif file_path.find("dimen") != -1:
         # dimen资源在dimen.xml中的匹配规则
         dimen_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # dimen资源在layout文件中的匹配规则
-        dimen_layout_pattern = re.compile('("\s*@\s*dimen\s*/\s*)(' + resource_name + ')([\s"])')
+        dimen_layout_pattern = re.compile('([">]\s*@\s*dimen\s*/\s*)(' + resource_name + ')([\s"<])')
         # dimen 资源在java文件中的匹配规则
-        dimen_java_pattern = re.compile('(R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);])')
+        dimen_java_pattern = re.compile('([^\.]R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);])')
         return dimen_xml_pattern, dimen_layout_pattern, dimen_java_pattern
 
     elif file_path.find("style") != -1:
         # style资源在style.xml中的匹配规则
         style_xml_pattern = re.compile('(style\s*name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # style资源在layout文件中的匹配规则
-        style_layout_pattern = re.compile('("\s*@\s*style\s*/\s*)(' + resource_name + ')([\s"])')
+        style_layout_pattern = re.compile('([">]\s*@\s*style\s*/\s*)(' + resource_name + ')([\s"<])')
         # style 资源在java文件中的匹配规则
-        style_java_pattern = re.compile('(R\s*\.\s*style\s*\.\s*)(' + resource_name + ')([\s,);])')
+        style_java_pattern = re.compile('([^\.]R\s*\.\s*style\s*\.\s*)(' + resource_name + ')([\s,);:])')
         return style_xml_pattern, style_layout_pattern, style_java_pattern
     else:
         return None, None, None
@@ -176,11 +190,17 @@ def get_not_file_pattern(file_path, resource_name):
 
 # 获取所有非文件资源名称
 def get_not_file_resources(path):
+    global IsFix, Prefix
     str_lists = []
     str_file = open(path, 'r')
-    resource_pat = re.compile('name\s*=\s*"([^\s]*)\s*"[\s>/]')
+    if IsFix:
+        resource_pat = re.compile('name\s*=\s*"\s*' + Prefix + '([^\s]*)\s*"[\s>/]')
+    else:
+        resource_pat = re.compile('name\s*=\s*"([^\s]*)\s*"[\s>/]')
     for line in str_file:
         if line.find("<item") != -1:
+            continue
+        if line.find("<enum") != -1:
             continue
         if line.lstrip().startswith("<!--"):
             continue
@@ -201,7 +221,7 @@ def rename_file():
         print("{} doesn't exits!".format(res_path))
         return
     for file in os.listdir(res_path):
-        file_path = res_path + "/" + file
+        file_path = res_path + file
         if file.find("value") != -1:
             # 跳过value相关文件夹
             continue
@@ -214,20 +234,27 @@ def rename_file():
 
 # 为某个资源文件夹下的资源文件重命名
 def rename_file_res_dir(dir_path):
-    global Prefix
+    global Prefix, IsFix
     # 遍历该资源文件夹
     for res_file in os.listdir(dir_path):
         file_path = dir_path + "/" + res_file
         if os.path.isdir(res_file):
             # 如果该资源文件夹下还有文件夹，忽略
             continue
-        elif res_file.startswith(Prefix):
+        elif (not IsFix) and res_file.startswith(Prefix):
             continue
         else:
-            # 先将此文件本身加上前缀
-            os.rename(file_path, dir_path + "/" + Prefix + res_file)
-            log_string("rename res file: {} ----> {}".format(res_file, Prefix + res_file))
-            xml_pat, java_pat = get_file_pattern(file_path, res_file.split('.')[0])
+            if not IsFix:
+                # 非修复模式下先将此文件本身加上前缀
+                os.rename(file_path, dir_path + "/" + Prefix + res_file)
+                log_string("rename res file: {} ----> {}".format(res_file, Prefix + res_file))
+
+            if IsFix:
+                # 取到tcl_listitem_test.xml中的listitem_test部分
+                resource_name = res_file.split(".")[0].replace(Prefix, "")
+            else:
+                resource_name = res_file.split(".")[0]
+            xml_pat, java_pat = get_file_pattern(file_path, resource_name)
             # 找到该资源上层的每一个模块，分别修改
             for mod in WorkModule:
                 module_path = os.path.abspath("..") + "/" + mod
@@ -237,7 +264,7 @@ def rename_file_res_dir(dir_path):
                     if not os.path.exists(module_path):
                         continue
                 log(res_file, mod, None)
-                rename_file_dir(module_path, res_file.split(".")[0], os.path.basename(module_path), xml_pat, java_pat)
+                rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat)
 
 
 # 为某个文件夹重命名文件资源
@@ -268,7 +295,7 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
                 print(line, end="")
                 log(resource_name, module_name, os.path.basename(file_path))
         elif file_path.endswith(".xml"):
-            if line.lstrip().startswith("<!--") :
+            if line.lstrip().startswith("<!--"):
                 # 跳过注释行
                 print(line, end="")
             elif xml_pat.search(line) is None:
@@ -286,33 +313,33 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
 def get_file_pattern(dir_path, file_name):
     if dir_path.find("drawable") != -1:
         # drawable下的资源在xml中的匹配规则
-        drawable_xml_pattern = re.compile('(@drawable\s*/)(' + file_name + ')([\s"])')
+        drawable_xml_pattern = re.compile('(@drawable\s*/)(' + file_name + ')([\s"<])')
         # drawable下的资源在java中的匹配规则
-        drawable_java_pattern = re.compile('(R\s*\.\s*drawable\s*\.\s*)(' + file_name + ')([\s,);])')
+        drawable_java_pattern = re.compile('([^\.]R\s*\.\s*drawable\s*\.\s*)(' + file_name + ')([\s,);:])')
         return drawable_xml_pattern, drawable_java_pattern
     elif dir_path.find("mipmap") != -1:
         # mipmap下的资源在xml中的匹配规则
-        mipmap_xml_pattern = re.compile('(@mipmap\s*/)(' + file_name + ')([\s"])')
+        mipmap_xml_pattern = re.compile('(@mipmap\s*/)(' + file_name + ')([\s"<])')
         # mipmap下的资源在java中的匹配规则
-        mipmap_java_pattern = re.compile('(R\s*\.\s*mipmap\s*\.\s*)(' + file_name + ')([\s,);])')
+        mipmap_java_pattern = re.compile('([^\.]R\s*\.\s*mipmap\s*\.\s*)(' + file_name + ')([\s,);:])')
         return mipmap_xml_pattern, mipmap_java_pattern
     elif dir_path.find("layout") != -1:
         # layout下的资源在xml中的匹配规则
-        layout_xml_pattern = re.compile('(@layout\s*/)(' + file_name + ')([\s"])')
+        layout_xml_pattern = re.compile('(@layout\s*/)(' + file_name + ')([\s"<])')
         # layout下的资源在java中的匹配规则
-        layout_java_pattern = re.compile('(R\s*\.\s*layout\s*\.\s*)(' + file_name + ')([\s,);])')
+        layout_java_pattern = re.compile('([^\.]R\s*\.\s*layout\s*\.\s*)(' + file_name + ')([\s,);:])')
         return layout_xml_pattern, layout_java_pattern
     elif dir_path.find("anim") != -1:
         # anim下的资源在xml中的匹配规则
-        anim_xml_pattern = re.compile('(@anim\s*/)(' + file_name + ')([\s"])')
+        anim_xml_pattern = re.compile('(@anim\s*/)(' + file_name + ')([\s"<])')
         # anim下的资源在java中的匹配规则
-        anim_java_pattern = re.compile('(R\s*\.\s*anim\s*\.\s*)(' + file_name + ')([\s,);])')
+        anim_java_pattern = re.compile('([^\.]R\s*\.\s*anim\s*\.\s*)(' + file_name + ')([\s,);:])')
         return anim_xml_pattern, anim_java_pattern
     elif dir_path.find("menu") != -1:
         # menu下的资源在xml中的匹配规则
-        menu_xml_pattern = re.compile('(@menu\s*/)(' + file_name + ')([\s"])')
+        menu_xml_pattern = re.compile('(@menu\s*/)(' + file_name + ')([\s"<])')
         # menu下的资源在java中的匹配规则
-        menu_java_pattern = re.compile('(R\s*\.\s*menu\s*\.\s*)(' + file_name + ')([\s,);])')
+        menu_java_pattern = re.compile('([^\.]R\s*\.\s*menu\s*\.\s*)(' + file_name + ')([\s,);:])')
         return menu_xml_pattern, menu_java_pattern
 
     else:
@@ -324,9 +351,9 @@ def get_file_pattern(dir_path, file_name):
 
 # 命令分发
 def cmd():
-    global Prefix, ExcludeDir, WorkModule
+    global Prefix, ExcludeDir, WorkModule, IsFix
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hp:e:m:", ["help", "prefix=", "exclude=", "module="])
+        opts, args = getopt.getopt(sys.argv[1:], "hfp:e:m:", ["help", "fix", "prefix=", "exclude=", "module="])
         for o, a in opts:
             if o in ("-h", "--help"):
                 help_info()
@@ -334,11 +361,13 @@ def cmd():
             elif o in ("-p", "--prefix"):
                 Prefix = a
             elif o in ("-e", "--exclude"):
-                dirs = a.replace(' ','').split(",")
+                dirs = a.replace(' ', '').split(",")
                 ExcludeDir = ExcludeDir + dirs
             elif o in ("-m", "--module"):
-                modules = a.replace(' ','').split(",")
+                modules = a.replace(' ', '').split(",")
                 WorkModule.extend(modules)
+            elif o in ("-f", "--fix"):
+                IsFix = True
             else:
                 print("Wrong argument!")
                 sys.exit(-1)
@@ -357,6 +386,8 @@ def help_info():
                               默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 
                               'gradle', 'assets'
      -h                       打印帮助
+     -f                       如果之前修改时遗漏了某个模块，利用 -p <pre_example> -m <遗漏的module>  -f
+                              这三个参数可以将遗漏的模块中的资源重命名
     """
     print(str_help)
 
@@ -392,9 +423,12 @@ def log_string(string):
 
 # 初始化输出日志
 def init():
-    global LogFile
+    global LogFile, IsFix
     path = os.path.join(os.environ['HOME'], "prefixLog_" + os.path.basename(os.path.abspath(os.curdir)) + ".txt")
-    LogFile = open(path, 'w')
+    if IsFix:
+        LogFile = open(path, 'a')
+    else:
+        LogFile = open(path, 'w')
     WorkModule.append(os.path.basename(os.path.abspath(os.path.curdir)))
 
 
@@ -411,8 +445,8 @@ def check():
 
 def main():
     cmd()
-    check()
     init()
+    check()
     rename_not_file()
     rename_file()
     return
