@@ -22,18 +22,69 @@ LogFile = None
 # 当前是否是修复模式
 IsFix = False
 
+# 项目根目录
+RootDir = ""
+
+# 所有module路径
+AllModulePath = []
+
+# 当前要修改的module名称
+NeedChangeModule = ""
+
+
+def get_all_module_path(cur_path: str) -> list:
+    """
+    获取某个路径下所有module
+    :param cur_path:  路径
+    :return: 路径的绝对地址的list
+    """
+
+    global ExcludeDir
+    module_path_list = []
+    for file in os.listdir(cur_path):
+        if file.startswith('.'):
+            # 以。开头的目录都要跳过
+            continue
+        if file in ExcludeDir:
+            continue
+        this_file_path = os.path.join(cur_path, file)
+        if os.path.exists(os.path.join(this_file_path, "src")) and os.path.exists(
+                os.path.exists(os.path.join(this_file_path, "build.gradle"))):
+            module_path_list.append(this_file_path)
+            # 当前module下仍然有可能有其他module
+            module_path_list.extend(get_all_module_path(this_file_path))
+        elif os.path.isdir(this_file_path):
+            module_path_list.extend(get_all_module_path(this_file_path))
+    return module_path_list
+
+
+def get_module_path(module: str) -> str:
+    """
+    获取某个module的路径
+    :param module:  module的名称
+    :return: 该module的绝对路径,如果没有返回空字符串
+    """
+    global AllModulePath
+    for path in AllModulePath:
+        if path.endswith(module):
+            return path
+
+    return ""
+
+
 ''''''''''''''''''''''''''''''''''' 以下是非文件资源的重命名方法'''''''''''''''''''''''''''''
 
 
 # 重命名非文件资源
 def rename_not_file():
-    global LogFile, Prefix
+    global LogFile, Prefix, NeedChangeModule
     possible_path = ["strings.xml", "string.xml", "colors.xml", "color.xml", "attr.xml",
                      "attrs.xml", "style.xml", "styles.xml", "dimen.xml", "dimens.xml"]
 
     has_resource_file = False
+    this_module_path = get_module_path(NeedChangeModule)
     for path in possible_path:
-        resource_file_path = os.path.abspath(".") + '/src/main/res/values/' + path
+        resource_file_path = this_module_path + '/src/main/res/values/' + path
         if not os.path.exists(resource_file_path):
             continue
         has_resource_file = True
@@ -45,12 +96,10 @@ def rename_not_file():
             log(s, None, None)
             # 找到该资源上层的每一个模块，分别修改
             for mod in WorkModule:
-                module_path = os.path.abspath("..") + "/" + mod
-                if not os.path.exists(module_path):
-                    # 继续向上一层寻找
-                    module_path = os.path.abspath("../..") + "/" + mod
-                    if not os.path.exists(module_path):
-                        continue
+                # 获取该模块的绝对路径
+                module_path = get_module_path(mod)
+                if module_path == "":
+                    continue
                 log(s, mod, None)
                 xml_pat, layout_pat, java_pat = get_not_file_pattern(resource_file_path, s)
                 rename_not_file_dir(module_path, s, mod, xml_pat, layout_pat, java_pat)
@@ -215,8 +264,8 @@ def get_not_file_resources(path):
 
 # 重命名文件资源方法
 def rename_file():
-    global LogFile, Prefix
-    res_path = os.path.abspath(os.curdir) + "/src/main/res/"
+    global LogFile, Prefix,NeedChangeModule
+    res_path = get_module_path(NeedChangeModule) + "/src/main/res/"
     if not os.path.exists(res_path):
         print("{} doesn't exits!".format(res_path))
         return
@@ -257,12 +306,7 @@ def rename_file_res_dir(dir_path):
             xml_pat, java_pat = get_file_pattern(file_path, resource_name)
             # 找到该资源上层的每一个模块，分别修改
             for mod in WorkModule:
-                module_path = os.path.abspath("..") + "/" + mod
-                if not os.path.exists(module_path):
-                    # 继续向上一层寻找
-                    module_path = os.path.abspath("../..") + "/" + mod
-                    if not os.path.exists(module_path):
-                        continue
+                module_path = get_module_path(mod)
                 log(res_file, mod, None)
                 rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat)
 
@@ -351,9 +395,10 @@ def get_file_pattern(dir_path, file_name):
 
 # 命令分发
 def cmd():
-    global Prefix, ExcludeDir, WorkModule, IsFix
+    global Prefix, ExcludeDir, WorkModule, IsFix, NeedChangeModule
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hfp:e:m:", ["help", "fix", "prefix=", "exclude=", "module="])
+        opts, args = getopt.getopt(sys.argv[1:], "hfp:e:m:t:",
+                                   ["help", "fix", "prefix=", "exclude=", "module=", "target="])
         for o, a in opts:
             if o in ("-h", "--help"):
                 help_info()
@@ -368,6 +413,10 @@ def cmd():
                 WorkModule.extend(modules)
             elif o in ("-f", "--fix"):
                 IsFix = True
+            elif o in ("-t", "--target"):
+                NeedChangeModule = a
+                # 本身这个模块也要修改
+                WorkModule.append(a)
             else:
                 print("Wrong argument!")
                 sys.exit(-1)
@@ -423,13 +472,14 @@ def log_string(string):
 
 # 初始化输出日志
 def init():
-    global LogFile, IsFix
+    global LogFile, IsFix, AllModulePath, RootDir
+    RootDir = os.path.abspath(os.path.curdir)
+    AllModulePath = get_all_module_path(RootDir)
     path = os.path.join(os.environ['HOME'], "prefixLog_" + os.path.basename(os.path.abspath(os.curdir)) + ".txt")
     if IsFix:
         LogFile = open(path, 'a')
     else:
         LogFile = open(path, 'w')
-    WorkModule.append(os.path.basename(os.path.abspath(os.path.curdir)))
 
 
 # 一些简单的检查
@@ -452,12 +502,20 @@ def main():
     return
 
 
+def test():
+    cmd()
+    init()
+    check()
+    string = get_not_file_resources(get_module_path(NeedChangeModule) + "/src/main/res/values/strings.xml")
+    string.sort()
+    for s in string:
+        print(s)
+
+
 try:
     main()
-    # file_path = "/home/jianglei/AndroidStudioProjects/login/LoginModule/TDFLoginModule/src/main/res/values/colors.xml"
-    # str = get_not_file_resources(file_path)
-    # xml_pat ,layout_pat,java_pat = get_not_file_pattern(file_path,"black")
-    # rename_not_file_file(file_path,"black","TDFLoginModule",xml_pat,layout_pat,java_pat)
-    # print(str)
+
+# 以下是测试使用
+
 except KeyboardInterrupt:
     pass
