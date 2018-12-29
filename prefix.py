@@ -167,6 +167,7 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
                 else:
                     if line.find("<item") != -1:
                         # 对于item项，应该使用layout_xml规则
+
                         line = layout_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
                     else:
                         line = xml_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
@@ -192,15 +193,15 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
 def get_not_file_pattern(file_path, resource_name):
     if file_path.find("string") != -1:
         # 字符串string.xml文件中的查找规则
-        str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
+        str_xml__pattern = re.compile('("\s\W*)(' + resource_name + ')([\s\W"])')
         # 字符串java文件中的查找规则
         str_java_pattern = re.compile('([^\.]R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);])')
         # 字符串layout文件中的查找规则
-        str_layout_xml_pattern = re.compile('([">]\s*@\s*string\s*/\s*)(' + resource_name + ')([\s"<])')
+        str_layout_xml_pattern = re.compile('([">]\s\W@\s*string\s*/\s*)(' + resource_name + ')([\s\W"<])')
         return str_xml__pattern, str_layout_xml_pattern, str_java_pattern
     elif file_path.find("attr") != -1:
         # attr 资源在attr.xml中的匹配规则
-        attr_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s*"])')
+        attr_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s\W"])')
         # attr 资源在layout文件中的查找规则
         attr_layout_pattern = re.compile('(:\s*)(' + resource_name + ')(\s*=)')
         # attr 资源在java文件中的查找规则
@@ -212,7 +213,7 @@ def get_not_file_pattern(file_path, resource_name):
         # color资源在color.xml文件中匹配规则
         color_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # color资源在layout文件中的匹配规则
-        color_layout_pattern = re.compile('([">]\s*@\s*color\s*/\s*)(' + resource_name + ')([\s"<])')
+        color_layout_pattern = re.compile('([">]\s\W@\s*color\s*/\s*)(' + resource_name + ')([\s\W"<])')
         # color 资源在java文件中的匹配规则
         color_java_pattern = re.compile('([^\.]R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);])')
         return color_xml_pattern, color_layout_pattern, color_java_pattern
@@ -220,7 +221,7 @@ def get_not_file_pattern(file_path, resource_name):
         # dimen资源在dimen.xml中的匹配规则
         dimen_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # dimen资源在layout文件中的匹配规则
-        dimen_layout_pattern = re.compile('([">]\s*@\s*dimen\s*/\s*)(' + resource_name + ')([\s"<])')
+        dimen_layout_pattern = re.compile('([">]\s\W@\s*dimen\s*/\s*)(' + resource_name + ')([\s\W"<])')
         # dimen 资源在java文件中的匹配规则
         dimen_java_pattern = re.compile('([^\.]R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);])')
         return dimen_xml_pattern, dimen_layout_pattern, dimen_java_pattern
@@ -229,7 +230,7 @@ def get_not_file_pattern(file_path, resource_name):
         # style资源在style.xml中的匹配规则
         style_xml_pattern = re.compile('(style\s*name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # style资源在layout文件中的匹配规则
-        style_layout_pattern = re.compile('([">]\s*@\s*style\s*/\s*)(' + resource_name + ')([\s"<])')
+        style_layout_pattern = re.compile('([">]\s\W@\s*style\s*/\s*)(' + resource_name + ')([\s\W"<])')
         # style 资源在java文件中的匹配规则
         style_java_pattern = re.compile('([^\.]R\s*\.\s*style\s*\.\s*)(' + resource_name + ')([\s,);:])')
         return style_xml_pattern, style_layout_pattern, style_java_pattern
@@ -264,7 +265,7 @@ def get_not_file_resources(path):
 
 # 重命名文件资源方法
 def rename_file():
-    global LogFile, Prefix,NeedChangeModule
+    global LogFile, Prefix, NeedChangeModule
     res_path = get_module_path(NeedChangeModule) + "/src/main/res/"
     if not os.path.exists(res_path):
         print("{} doesn't exits!".format(res_path))
@@ -303,27 +304,45 @@ def rename_file_res_dir(dir_path):
                 resource_name = res_file.split(".")[0].replace(Prefix, "")
             else:
                 resource_name = res_file.split(".")[0]
-            xml_pat, java_pat = get_file_pattern(file_path, resource_name)
+            # databinding_pat 除非文件是layout文件，不然会是空
+            xml_pat, java_pat, databinding_pat = get_file_pattern(file_path, resource_name)
             # 找到该资源上层的每一个模块，分别修改
             for mod in WorkModule:
                 module_path = get_module_path(mod)
                 log(res_file, mod, None)
-                rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat)
+                rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat,databinding_pat)
 
 
-# 为某个文件夹重命名文件资源
-def rename_file_dir(dir_path, resource_name, module_name, xml_pat, java_pat):
+def rename_file_dir(dir_path, resource_name, module_name, xml_pat, java_pat, databinding_pat):
+    """
+    重命名某个文件夹下某个文件资源的所有引用
+    :param dir_path: 文件路径
+    :param resource_name: 文件资源名称
+    :param module_name:  模块名称
+    :param xml_pat:  xml中的引用正则
+    :param java_pat:  java文件中的引用正则
+    :param databinding_pat:  java中databinding生成的正则，只对layout文件有效，其他情况下为空
+    """
     global ExcludeDir
     for file in os.listdir(dir_path):
         file_path = dir_path + "/" + file
         if os.path.isdir(file_path) and file not in ExcludeDir:
-            rename_file_dir(file_path, resource_name, module_name, xml_pat, java_pat)
+            rename_file_dir(file_path, resource_name, module_name, xml_pat, java_pat, databinding_pat)
         elif not os.path.isdir(file_path):
             if file.endswith(".java") or file.endswith(".xml"):
-                rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat)
+                rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat, databinding_pat)
 
 
-def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
+def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat, databinding_pat):
+    """
+    为某个文件重命名所有对某个资源文件的引用
+    :param file_path: 文件路径
+    :param resource_name: 资源名称
+    :param module_name: 模块名称
+    :param xml_pat:  改文件资源在xml中的引用正则
+    :param java_pat: 该文件资源在java文件中的引用正则
+    :param databinding_pat:  layout文件资源在java中生成的databinding规则
+    """
     global Prefix
     for line in fileinput.input(file_path, inplace=1):
         if file_path.endswith(".java"):
@@ -331,13 +350,23 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
             if line.lstrip().startswith("//") or line.lstrip().startswith("/*"):
                 # 跳过注释行
                 print(line, end="")
-            elif java_pat.search(line) is None:
+            elif java_pat.search(line) is None and (
+                    databinding_pat is not None and databinding_pat.search(line) is None):
                 # 跳过不包含目标的行
                 print(line, end="")
-            else:
+            elif java_pat.search(line) is not None:
+                # 修改正常的java对资源文件的引用
                 line = java_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
                 print(line, end="")
                 log(resource_name, module_name, os.path.basename(file_path))
+            elif databinding_pat is not None and databinding_pat.search(line) is not None:
+                # 修改databinding生成的类名引用
+                new_name = get_databinding_name(Prefix+resource_name)
+                line = databinding_pat.sub('\g<1>' + new_name + '\g<3>', line)
+                print(line, end="")
+                log(resource_name, module_name, os.path.basename(file_path))
+            else:
+                print(line, end="")
         elif file_path.endswith(".xml"):
             if line.lstrip().startswith("<!--"):
                 # 跳过注释行
@@ -355,39 +384,65 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat):
 
 # 获取不同资源文件对应的正则表达式
 def get_file_pattern(dir_path, file_name):
+    """
+    获取不同资源文件对应的正则表达式
+    :param dir_path: 资源文件路径
+    :param file_name: 文件名称
+    :return:  返回三个值，分别是改资源文件在xml 和 java文件中的规则，如果是layout文件，则第三个值是databinding根据layout
+              生成对象的规则，否则是none
+    """
     if dir_path.find("drawable") != -1:
         # drawable下的资源在xml中的匹配规则
-        drawable_xml_pattern = re.compile('(@drawable\s*/)(' + file_name + ')([\s"<])')
+        drawable_xml_pattern = re.compile('([\s\W]@drawable\s*/)(' + file_name + ')([\s\W"<])')
         # drawable下的资源在java中的匹配规则
         drawable_java_pattern = re.compile('([^\.]R\s*\.\s*drawable\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return drawable_xml_pattern, drawable_java_pattern
+        return drawable_xml_pattern, drawable_java_pattern,None
     elif dir_path.find("mipmap") != -1:
         # mipmap下的资源在xml中的匹配规则
-        mipmap_xml_pattern = re.compile('(@mipmap\s*/)(' + file_name + ')([\s"<])')
+        mipmap_xml_pattern = re.compile('([\s\W]@mipmap\s*/)(' + file_name + ')([\s\W"<])')
         # mipmap下的资源在java中的匹配规则
         mipmap_java_pattern = re.compile('([^\.]R\s*\.\s*mipmap\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return mipmap_xml_pattern, mipmap_java_pattern
+        return mipmap_xml_pattern, mipmap_java_pattern,None
     elif dir_path.find("layout") != -1:
         # layout下的资源在xml中的匹配规则
-        layout_xml_pattern = re.compile('(@layout\s*/)(' + file_name + ')([\s"<])')
+        layout_xml_pattern = re.compile('([\s\W]@layout\s*/)(' + file_name + ')([\s\W"<])')
         # layout下的资源在java中的匹配规则
         layout_java_pattern = re.compile('([^\.]R\s*\.\s*layout\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return layout_xml_pattern, layout_java_pattern
+        # layout下的资源生成类的匹配规则
+        databinding_pattern = re.compile('(.*)('+get_databinding_name(file_name)+')(.*)')
+        return layout_xml_pattern, layout_java_pattern,databinding_pattern
     elif dir_path.find("anim") != -1:
         # anim下的资源在xml中的匹配规则
-        anim_xml_pattern = re.compile('(@anim\s*/)(' + file_name + ')([\s"<])')
+        anim_xml_pattern = re.compile('([\s\W]@anim\s*/)(' + file_name + ')([\s\W"<])')
         # anim下的资源在java中的匹配规则
         anim_java_pattern = re.compile('([^\.]R\s*\.\s*anim\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return anim_xml_pattern, anim_java_pattern
+        return anim_xml_pattern, anim_java_pattern,None
     elif dir_path.find("menu") != -1:
         # menu下的资源在xml中的匹配规则
-        menu_xml_pattern = re.compile('(@menu\s*/)(' + file_name + ')([\s"<])')
+        menu_xml_pattern = re.compile('([\s\W]@menu\s*/)(' + file_name + ')([\s\W"<])')
         # menu下的资源在java中的匹配规则
         menu_java_pattern = re.compile('([^\.]R\s*\.\s*menu\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return menu_xml_pattern, menu_java_pattern
+        return menu_xml_pattern, menu_java_pattern,None
 
     else:
-        return None, None
+        return None, None,None
+
+
+def get_databinding_name(file_name: str) -> str:
+    """
+    根据xml文件名获取到databinding生成的对象名称,ru tdf_component_button.xml 得到TdfComponentButtonBinding
+    :param file_name: xml文件名称
+    :return: 处理后的名称
+    """
+    chs = list(file_name)
+    chs[0] = chs[0].upper()
+    for index in range(len(chs)):
+        if chs[index] == "_" and index < len(chs) - 1:
+            # 将一个字母大写
+            chs[index + 1] = chs[index + 1].upper()
+
+    res = ''.join(chs)
+    return res.replace("_", "") + "Binding"
 
 
 ''''''''''''''''''''''''''''''''''''''''''''''以下是一些辅助方法'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -503,17 +558,22 @@ def main():
 
 
 def test():
-    cmd()
-    init()
-    check()
-    string = get_not_file_resources(get_module_path(NeedChangeModule) + "/src/main/res/values/strings.xml")
-    string.sort()
-    for s in string:
-        print(s)
+    content = """
+     android:text="@string/jaogn"
+tools:text="@string/jfaong"
+app:text="@string/jtgoang"
+    """
+    regx = "(?<!tools)(:\s*)(text)(\s*=)"
+    p = re.compile(regx)
+    print(p.search(content))
+    res = p.sub("\g<1>hehe\g<3>",content)
+    print(res)
+
 
 
 try:
     main()
+    # test()
 
 # 以下是测试使用
 
