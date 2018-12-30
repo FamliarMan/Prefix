@@ -182,7 +182,11 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
                     # 跳过不包含目标的行
                     print(line, end="")
                 else:
-                    line = layout_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
+                    if layout_pat.groups == 5:
+                        # 对于attr在xml中的要特殊对待
+                        line = layout_pat.sub('\g<1>\g<2>' + Prefix + resource_name + '\g<4>', line)
+                    else:
+                        line = layout_pat.sub('\g<1>' + Prefix + resource_name + '\g<3>', line)
                     print(line, end="")
                     log(resource_name, module_name, os.path.basename(file_path))
 
@@ -203,7 +207,7 @@ def get_not_file_pattern(file_path, resource_name):
         # attr 资源在attr.xml中的匹配规则
         attr_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s\W"])')
         # attr 资源在layout文件中的查找规则
-        attr_layout_pattern = re.compile('(:\s*)(' + resource_name + ')(\s*=)')
+        attr_layout_pattern = re.compile('(?<!(android|[\s]{2}tools))(:\s*)(' + resource_name + ')(\s*=)')
         # attr 资源在java文件中的查找规则
         attr_java_pattern = re.compile(
             '([^\.]R\s*\.\s*styleable\s*\.\s*)(' + resource_name + ')([_\s,;)])|([^\.]R\s*\.\s*styleable\s*\.\s*\S*_)(' +
@@ -560,20 +564,20 @@ def main():
 def test():
     content = """
      android:text="@string/jaogn"
-tools:text="@string/jfaong"
+  tools:text="@string/jfaong"
 app:text="@string/jtgoang"
     """
-    regx = "(?<!tools)(:\s*)(text)(\s*=)"
+    regx = "(?<!(android|[\s]{2}tools))(:\s*)(text)(\s*=)"
     p = re.compile(regx)
     print(p.search(content))
-    res = p.sub("\g<1>hehe\g<3>",content)
+    res = p.sub("\g<1>\g<2>hehe\g<4>",content)
     print(res)
 
 
 
 try:
-    main()
-    # test()
+    # main()
+    test()
 
 # 以下是测试使用
 
