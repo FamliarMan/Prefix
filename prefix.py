@@ -80,6 +80,7 @@ def rename_not_file():
     global LogFile, Prefix, NeedChangeModule
     possible_path = ["strings.xml", "string.xml", "colors.xml", "color.xml", "attr.xml",
                      "attrs.xml", "style.xml", "styles.xml", "dimen.xml", "dimens.xml"]
+    # possible_path = ["strings.xml"]
 
     has_resource_file = False
     this_module_path = get_module_path(NeedChangeModule)
@@ -197,11 +198,11 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
 def get_not_file_pattern(file_path, resource_name):
     if file_path.find("string") != -1:
         # 字符串string.xml文件中的查找规则
-        str_xml__pattern = re.compile('("\s\W*)(' + resource_name + ')([\s\W"])')
+        str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
         # 字符串java文件中的查找规则
         str_java_pattern = re.compile('([^\.]R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);])')
         # 字符串layout文件中的查找规则
-        str_layout_xml_pattern = re.compile('([">]\s\W@\s*string\s*/\s*)(' + resource_name + ')([\s\W"<])')
+        str_layout_xml_pattern = re.compile('([\s\W]@\s*string\s*/\s*)(' + resource_name + ')([\s\W])')
         return str_xml__pattern, str_layout_xml_pattern, str_java_pattern
     elif file_path.find("attr") != -1:
         # attr 资源在attr.xml中的匹配规则
@@ -217,7 +218,7 @@ def get_not_file_pattern(file_path, resource_name):
         # color资源在color.xml文件中匹配规则
         color_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # color资源在layout文件中的匹配规则
-        color_layout_pattern = re.compile('([">]\s\W@\s*color\s*/\s*)(' + resource_name + ')([\s\W"<])')
+        color_layout_pattern = re.compile('([\s\W]@\s*color\s*/\s*)(' + resource_name + ')([\s\W])')
         # color 资源在java文件中的匹配规则
         color_java_pattern = re.compile('([^\.]R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);])')
         return color_xml_pattern, color_layout_pattern, color_java_pattern
@@ -225,7 +226,7 @@ def get_not_file_pattern(file_path, resource_name):
         # dimen资源在dimen.xml中的匹配规则
         dimen_xml_pattern = re.compile('(name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # dimen资源在layout文件中的匹配规则
-        dimen_layout_pattern = re.compile('([">]\s\W@\s*dimen\s*/\s*)(' + resource_name + ')([\s\W"<])')
+        dimen_layout_pattern = re.compile('([\s\W]@\s*dimen\s*/\s*)(' + resource_name + ')([\s\W])')
         # dimen 资源在java文件中的匹配规则
         dimen_java_pattern = re.compile('([^\.]R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);])')
         return dimen_xml_pattern, dimen_layout_pattern, dimen_java_pattern
@@ -234,7 +235,7 @@ def get_not_file_pattern(file_path, resource_name):
         # style资源在style.xml中的匹配规则
         style_xml_pattern = re.compile('(style\s*name\s*=\s*"\s*)(' + resource_name + ')([\s"])')
         # style资源在layout文件中的匹配规则
-        style_layout_pattern = re.compile('([">]\s\W@\s*style\s*/\s*)(' + resource_name + ')([\s\W"<])')
+        style_layout_pattern = re.compile('([\s\W]@\s*style\s*/\s*)(' + resource_name + ')([\s\W])')
         # style 资源在java文件中的匹配规则
         style_java_pattern = re.compile('([^\.]R\s*\.\s*style\s*\.\s*)(' + resource_name + ')([\s,);:])')
         return style_xml_pattern, style_layout_pattern, style_java_pattern
@@ -576,8 +577,8 @@ app:text="@string/jtgoang"
 
 
 try:
-    # main()
-    test()
+    main()
+    # test()
 
 # 以下是测试使用
 
