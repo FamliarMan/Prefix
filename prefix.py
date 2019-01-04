@@ -152,6 +152,10 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
         elif file_path.endswith(".xml"):
             if file_path.find("src/main/res/values") != -1:
                 # 该xml文件是非layout,drawable文件,一般是string.xml,color.xml等文件
+                if module_name != NeedChangeModule:
+                    # 只修改目标module的string,color等xml文件
+                    print(line, end="")
+                    continue
                 if line.lstrip().startswith("<!--"):
                     # 跳过注释行
                     print(line, end="")
@@ -183,7 +187,7 @@ def rename_not_file_file(file_path, resource_name, module_name, xml_pat, layout_
                     # 跳过不包含目标的行
                     print(line, end="")
                 else:
-                    if layout_pat.groups == 5:
+                    if layout_pat.groups == 4:
                         # 对于attr在xml中的要特殊对待
                         line = layout_pat.sub('\g<1>\g<2>' + Prefix + resource_name + '\g<4>', line)
                     else:
@@ -200,9 +204,9 @@ def get_not_file_pattern(file_path, resource_name):
         # 字符串string.xml文件中的查找规则
         str_xml__pattern = re.compile('("\s*)(' + resource_name + ')([\s*"])')
         # 字符串java文件中的查找规则
-        str_java_pattern = re.compile('([^\.]R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);])')
+        str_java_pattern = re.compile('([^\.\w]R\s*\.\s*string\s*\.\s*)(' + resource_name + ')([\s,);:])')
         # 字符串layout文件中的查找规则
-        str_layout_xml_pattern = re.compile('([\s\W]@\s*string\s*/\s*)(' + resource_name + ')([\s\W])')
+        str_layout_xml_pattern = re.compile('([^_\s\W]@\s*string\s*/\s*)(' + resource_name + ')([\s\W])')
         return str_xml__pattern, str_layout_xml_pattern, str_java_pattern
     elif file_path.find("attr") != -1:
         # attr 资源在attr.xml中的匹配规则
@@ -211,8 +215,8 @@ def get_not_file_pattern(file_path, resource_name):
         attr_layout_pattern = re.compile('(?<!(android|[\s]{2}tools))(:\s*)(' + resource_name + ')(\s*=)')
         # attr 资源在java文件中的查找规则
         attr_java_pattern = re.compile(
-            '([^\.]R\s*\.\s*styleable\s*\.\s*)(' + resource_name + ')([_\s,;)])|([^\.]R\s*\.\s*styleable\s*\.\s*\S*_)(' +
-            resource_name + ')([\s,;)])')
+            '([^\.]R\s*\.\s*styleable\s*\.\s*)(' + resource_name + ')([_\s,;:)])|([^\.]R\s*\.\s*styleable\s*\.\s*\S*_)(' +
+            resource_name + ')([\s,;:)])')
         return attr_xml_pattern, attr_layout_pattern, attr_java_pattern
     elif file_path.find("color") != -1:
         # color资源在color.xml文件中匹配规则
@@ -220,7 +224,7 @@ def get_not_file_pattern(file_path, resource_name):
         # color资源在layout文件中的匹配规则
         color_layout_pattern = re.compile('([\s\W]@\s*color\s*/\s*)(' + resource_name + ')([\s\W])')
         # color 资源在java文件中的匹配规则
-        color_java_pattern = re.compile('([^\.]R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);])')
+        color_java_pattern = re.compile('([^\.]R\s*\.\s*color\s*\.\s*)(' + resource_name + ')([\s,);:])')
         return color_xml_pattern, color_layout_pattern, color_java_pattern
     elif file_path.find("dimen") != -1:
         # dimen资源在dimen.xml中的匹配规则
@@ -228,7 +232,7 @@ def get_not_file_pattern(file_path, resource_name):
         # dimen资源在layout文件中的匹配规则
         dimen_layout_pattern = re.compile('([\s\W]@\s*dimen\s*/\s*)(' + resource_name + ')([\s\W])')
         # dimen 资源在java文件中的匹配规则
-        dimen_java_pattern = re.compile('([^\.]R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);])')
+        dimen_java_pattern = re.compile('([^\.]R\s*\.\s*dimen\s*\.\s*)(' + resource_name + ')([\s,);:])')
         return dimen_xml_pattern, dimen_layout_pattern, dimen_java_pattern
 
     elif file_path.find("style") != -1:
@@ -311,11 +315,14 @@ def rename_file_res_dir(dir_path):
                 resource_name = res_file.split(".")[0]
             # databinding_pat 除非文件是layout文件，不然会是空
             xml_pat, java_pat, databinding_pat = get_file_pattern(file_path, resource_name)
+            if xml_pat is None or java_pat is None:
+                continue
             # 找到该资源上层的每一个模块，分别修改
             for mod in WorkModule:
                 module_path = get_module_path(mod)
                 log(res_file, mod, None)
-                rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat,databinding_pat)
+                rename_file_dir(module_path, resource_name, os.path.basename(module_path), xml_pat, java_pat,
+                                databinding_pat)
 
 
 def rename_file_dir(dir_path, resource_name, module_name, xml_pat, java_pat, databinding_pat):
@@ -329,6 +336,8 @@ def rename_file_dir(dir_path, resource_name, module_name, xml_pat, java_pat, dat
     :param databinding_pat:  java中databinding生成的正则，只对layout文件有效，其他情况下为空
     """
     global ExcludeDir
+    if not os.path.isdir(dir_path):
+        return
     for file in os.listdir(dir_path):
         file_path = dir_path + "/" + file
         if os.path.isdir(file_path) and file not in ExcludeDir:
@@ -366,7 +375,7 @@ def rename_file_file(file_path, resource_name, module_name, xml_pat, java_pat, d
                 log(resource_name, module_name, os.path.basename(file_path))
             elif databinding_pat is not None and databinding_pat.search(line) is not None:
                 # 修改databinding生成的类名引用
-                new_name = get_databinding_name(Prefix+resource_name)
+                new_name = get_databinding_name(Prefix + resource_name)
                 line = databinding_pat.sub('\g<1>' + new_name + '\g<3>', line)
                 print(line, end="")
                 log(resource_name, module_name, os.path.basename(file_path))
@@ -401,36 +410,36 @@ def get_file_pattern(dir_path, file_name):
         drawable_xml_pattern = re.compile('([\s\W]@drawable\s*/)(' + file_name + ')([\s\W"<])')
         # drawable下的资源在java中的匹配规则
         drawable_java_pattern = re.compile('([^\.]R\s*\.\s*drawable\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return drawable_xml_pattern, drawable_java_pattern,None
+        return drawable_xml_pattern, drawable_java_pattern, None
     elif dir_path.find("mipmap") != -1:
         # mipmap下的资源在xml中的匹配规则
         mipmap_xml_pattern = re.compile('([\s\W]@mipmap\s*/)(' + file_name + ')([\s\W"<])')
         # mipmap下的资源在java中的匹配规则
         mipmap_java_pattern = re.compile('([^\.]R\s*\.\s*mipmap\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return mipmap_xml_pattern, mipmap_java_pattern,None
+        return mipmap_xml_pattern, mipmap_java_pattern, None
     elif dir_path.find("layout") != -1:
         # layout下的资源在xml中的匹配规则
         layout_xml_pattern = re.compile('([\s\W]@layout\s*/)(' + file_name + ')([\s\W"<])')
         # layout下的资源在java中的匹配规则
         layout_java_pattern = re.compile('([^\.]R\s*\.\s*layout\s*\.\s*)(' + file_name + ')([\s,);:])')
         # layout下的资源生成类的匹配规则
-        databinding_pattern = re.compile('(.*)('+get_databinding_name(file_name)+')(.*)')
-        return layout_xml_pattern, layout_java_pattern,databinding_pattern
+        databinding_pattern = re.compile('([\.\s])(' + get_databinding_name(file_name) + ')(.*)')
+        return layout_xml_pattern, layout_java_pattern, databinding_pattern
     elif dir_path.find("anim") != -1:
         # anim下的资源在xml中的匹配规则
         anim_xml_pattern = re.compile('([\s\W]@anim\s*/)(' + file_name + ')([\s\W"<])')
         # anim下的资源在java中的匹配规则
         anim_java_pattern = re.compile('([^\.]R\s*\.\s*anim\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return anim_xml_pattern, anim_java_pattern,None
+        return anim_xml_pattern, anim_java_pattern, None
     elif dir_path.find("menu") != -1:
         # menu下的资源在xml中的匹配规则
         menu_xml_pattern = re.compile('([\s\W]@menu\s*/)(' + file_name + ')([\s\W"<])')
         # menu下的资源在java中的匹配规则
         menu_java_pattern = re.compile('([^\.]R\s*\.\s*menu\s*\.\s*)(' + file_name + ')([\s,);:])')
-        return menu_xml_pattern, menu_java_pattern,None
+        return menu_xml_pattern, menu_java_pattern, None
 
     else:
-        return None, None,None
+        return None, None, None
 
 
 def get_databinding_name(file_name: str) -> str:
@@ -473,10 +482,12 @@ def cmd():
                 WorkModule.extend(modules)
             elif o in ("-f", "--fix"):
                 IsFix = True
+                WorkModule.remove(NeedChangeModule)
             elif o in ("-t", "--target"):
                 NeedChangeModule = a
                 # 本身这个模块也要修改
-                WorkModule.append(a)
+                if not IsFix:
+                    WorkModule.append(a)
             else:
                 print("Wrong argument!")
                 sys.exit(-1)
@@ -564,16 +575,15 @@ def main():
 
 def test():
     content = """
-     android:text="@string/jaogn"
-  tools:text="@string/jfaong"
-app:text="@string/jtgoang"
+          AdapterHealthcheckReportsBinding mBinding 
+import zmsoft.rest.phone.managercheckmodule.databinding.AdapterHealthcheckReportsBinding;
     """
-    regx = "(?<!(android|[\s]{2}tools))(:\s*)(text)(\s*=)"
+    regx = "(.*)(AdapterHealthcheckReportsBinding)(.*)"
     p = re.compile(regx)
     print(p.search(content))
-    res = p.sub("\g<1>\g<2>hehe\g<4>",content)
+    print(p.groups)
+    res = p.sub("\g<1>MckAdapterHealthcheckReportsBinding\g<3>", content)
     print(res)
-
 
 
 try:

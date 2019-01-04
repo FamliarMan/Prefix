@@ -41,14 +41,13 @@
 
 ``` 
 以上面这个工程为例，依赖关系时app ------>  library1 ------- >library2
-app是最顶层的，如果要修改library1模块的资源，那么最好保证app和library1平级或者在library1上一级目录。
 ## 使用方法
-在要修改的模块的根目录执行下列命令：
-python3 prefix.py  -m [app|library1]  -p lib2_    -e [hehe|test]  
+在要修改的模块的根目录(无论是修改app还是library1还是library2)执行下列命令：
+python3 prefix.py  -m app,library1  -p lib2_    -e hehe,test
 **注意：绝对不要包含任何空格**
 
 参数说明：
-* -m  传入本模块的上层依赖模块，有过个模块用“|”分割，注意，不需要示例中的中括号
+* -m  传入本模块的上层依赖模块，有多个模块用“,”分割
 * -p  指定前缀名称
 * -e  指定排除的目录，虽然资源名称改了，但某些目录肯定不用有变动的，这里可以排除掉，默认排除了：'build', '.idea', 'target', '.gradle', 'lib', '.git', 'gradle', 'assets'
 *  -f 如果之前使用-m指定依赖的上层模块时，命令执行完发现漏了模块，可以重新利用-m指定遗漏的模块，只不过要加上-f参数
